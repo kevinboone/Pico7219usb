@@ -1,0 +1,14 @@
+The LED matrix has five connections -- three SPI connections, 5V power, and
+ground. The table below shows how to connect the matrix to the Pico. It's
+perfectly possible to use different pin connections on the Pico -- it will be
+necessary to change the values in prog/config.h, and rebuild.
+
+Pico function    Pico GPIO  Pico physical  LED matrix
+name             number     pin number     pin name
+
+VBUS                        40             VCC
+SPI0 CS          17         22             CS
+GND                         23             GND
+SPI0 SCK         18         24             CLK
+SPI0 TX (MOSI)   19         25             DIN
+

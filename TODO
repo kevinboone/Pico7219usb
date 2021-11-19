@@ -1,0 +1,10 @@
+Work out what how high the SPI baud rate can be, if cable connections are
+made really short and tidy.
+
+Expand virtual modules when writing individual LEDs. Presently scroll
+wrapping doesn't work reliably when individual LEDs are written,
+unless they remain within the physical display size.
+
+Provide a command to set scroll speed (if it can be made fast enough to
+be worthwhile)
+

@@ -1,0 +1,5 @@
+Pico7219usb implements a simple line-based protocol over a USB-serial
+connection to the host computer. Each line consists of a command, which
+writes text, changes status of individual LEDs, of controls the LED
+matrix in some way. For full details, see the file prog/protocol.h.
+
