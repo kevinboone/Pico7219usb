@@ -91,33 +91,6 @@ int get_string_length_modules (const char *s)
   return get_string_length_pixels(s) / 8 + 1;
   }
 
-// Show a string of characters, and then scroll it across the display.
-// This function uses pico7219_set_virtual_chain_length() to ensure that
-// there are enough "virtual" modules in the display chain to fit
-// the whole string. It then scrolls it enough times to scroll the 
-// whole string right off the end.
-// NB: only used for testing.
-/*
-void show_text_and_scroll (Pico7219 *pico7219, const char *string)
-  {
-  pico7219_set_virtual_chain_length (pico7219, 
-    get_string_length_modules(string));
-  draw_string (pico7219, string, FALSE);
-  pico7219_flush (pico7219);
-
-  int l = get_string_length_pixels (string);
-
-  for (int i = 0; i < l; i++)
-    {
-    sleep_ms (50);
-    pico7219_scroll (pico7219, FALSE);
-    }
-
-  pico7219_switch_off_all (pico7219, TRUE);
-  sleep_ms (500);
-  }
-*/
-
 //
 // size_and_draw_string
 //
@@ -125,10 +98,30 @@ void show_text_and_scroll (Pico7219 *pico7219, const char *string)
 // in the string, then draw the string.
 void size_and_draw_string (Pico7219 *pico7219, const char *string)
   {
-  int slm = get_string_length_modules(string);
+  int slm = get_string_length_modules (string);
   if (slm < CHAIN_LEN) slm = CHAIN_LEN;
-  pico7219_set_virtual_chain_length (pico7219, slm);
+  if (slm > pico7219_get_virtual_chain_length (pico7219)) 
+    pico7219_set_virtual_chain_length (pico7219, slm);
   draw_string (pico7219, string, FALSE);
+  }
+
+
+void size_and_turn_on (Pico7219 *pico7219, int x, int y)
+  {
+  int slm = x / 8 + 1;
+  if (slm < CHAIN_LEN) slm = CHAIN_LEN;
+  if (slm > pico7219_get_virtual_chain_length (pico7219)) 
+    pico7219_set_virtual_chain_length (pico7219, slm);
+  pico7219_switch_on (pico7219, y, x, FALSE);
+  }
+
+void size_and_turn_off (Pico7219 *pico7219, int x, int y)
+  {
+  int slm = x / 8 + 1;
+  if (slm < CHAIN_LEN) slm = CHAIN_LEN;
+  if (slm > pico7219_get_virtual_chain_length (pico7219)) 
+    pico7219_set_virtual_chain_length (pico7219, slm);
+  pico7219_switch_off (pico7219, y, x, FALSE);
   }
 
 //
@@ -176,105 +169,106 @@ void process_input_buffer (Pico7219 *pico7219, Buffer *in_buffer,
       int x, y;
       case CMD_ON:
         if (sscanf (in_buffer->c_str + 1, "%d,%d", &x, &y) == 2)
-	  {
-	  pico7219_switch_on (pico7219, y, x, FALSE);
+          {
+	  size_and_turn_on (pico7219, y, x);
           respond_ok();
-	  }
-	else 
-	  {
+          }
+        else 
+          {
           respond_error (ERR_ARGS, in_buffer->c_str + 1);
-	  }
+          }
         break;
 
       case CMD_OFF:
         if (sscanf (in_buffer->c_str + 1, "%d,%d", &x, &y) == 2)
-	  {
-	  pico7219_switch_off (pico7219, y, x, FALSE);
+          {
+	  size_and_turn_off (pico7219, y, x);
           respond_ok();
-	  }
-	else 
-	  {
+          }
+        else 
+          {
           respond_error (ERR_ARGS, in_buffer->c_str + 1);
-	  }
+          }
         break;
 
       case CMD_FLUSH:
         pico7219_flush (pico7219);
         respond_ok();
-	break;
+        break;
 
       case CMD_CHAR:
-	if (in_buffer->length >= 2)
-	  {
-	  if (in_buffer->length < MAX_LINE)
-	    {
-	    buffer_append (line_buffer, in_buffer->c_str[1]);
-	    size_and_draw_string (pico7219, line_buffer->c_str);
+        if (in_buffer->length >= 2)
+          {
+          if (in_buffer->length < MAX_LINE)
+            {
+            buffer_append (line_buffer, in_buffer->c_str[1]);
+            size_and_draw_string (pico7219, line_buffer->c_str);
             respond_ok();
-	    }
-	  else
+            }
+          else
             respond_error (ERR_TOOLONG, in_buffer->c_str + 1);
-	  }
-	else
+          }
+        else
           respond_error (ERR_TOOSHORT, NULL);
-	break;
+        break;
 
       case CMD_STRING:
-	if (in_buffer->length >= 2)
-	  {
-	  if (strlen (in_buffer->c_str + 1) < MAX_LINE)
-	    {
-	    buffer_set (line_buffer, in_buffer->c_str + 1);
-	    size_and_draw_string (pico7219, line_buffer->c_str);
+        if (in_buffer->length >= 2)
+          {
+          if (strlen (in_buffer->c_str + 1) < MAX_LINE)
+            {
+            buffer_set (line_buffer, in_buffer->c_str + 1);
+            size_and_draw_string (pico7219, line_buffer->c_str);
             pico7219_flush (pico7219);
             respond_ok();
-	    }
-	  else
+            }
+          else
             respond_error (ERR_TOOLONG, in_buffer->c_str + 1);
-	  }
-	else
+          }
+        else
           respond_error (ERR_TOOSHORT, NULL);
-	break;
+        break;
 
       case CMD_RESET:
-	buffer_reset (line_buffer);
-	pico7219_switch_off_all (pico7219, TRUE);
-	pico7219_set_intensity (pico7219, 1);
-	scroll_count = SCROLL_TIME;
-	scrolling = FALSE;
+        buffer_reset (line_buffer);
+        pico7219_switch_off_all (pico7219, TRUE);
+        pico7219_set_intensity (pico7219, 1);
+        pico7219_set_virtual_chain_length (pico7219, CHAIN_LEN);
+        scroll_count = SCROLL_TIME;
+        scrolling = FALSE;
         respond_ok();
-	break;
+        break;
 
       case CMD_SCROLL:
-	pico7219_scroll (pico7219, TRUE);
+        pico7219_scroll (pico7219, TRUE);
         respond_ok();
-	break;
+        break;
 
       case CMD_SCROLLON:
         scrolling = TRUE;
-	scroll_count = SCROLL_TIME;
+        scroll_count = SCROLL_TIME;
         respond_ok();
-	break;
+        break;
 
       case CMD_SCROLLOFF:
         scrolling = FALSE;
-	scroll_count = SCROLL_TIME;
+        scroll_count = SCROLL_TIME;
         respond_ok();
-	break;
+        break;
 
       case CMD_BRIGHTNESS:
         if (sscanf (in_buffer->c_str + 1, "%d", &x) == 1)
-	  {
-	  if (x < 0) x = 0;
-	  if (x > 15) x = 15;
-	  pico7219_set_intensity (pico7219, x);
+          {
+          if (x < 0) x = 0;
+          if (x > 15) x = 15;
+          pico7219_set_intensity (pico7219, x);
           respond_ok();
-	  }
-	else 
-	  {
+          }
+        else 
+          {
           respond_error (ERR_ARGS, in_buffer->c_str + 1);
-	  }
-	break;
+          }
+        break;
 
       default:
         respond_error (ERR_BADCMD, in_buffer->c_str + 1);
@@ -299,7 +293,10 @@ int main()
   //  baud rate. The last parameter indicates whether the column order
   //  should be reversed -- this depends on how the LED matrix is wired
   //  to the MAX7219, and isn't easy to determine except by trying.
-  Pico7219 *pico7219 = pico7219_create (SPI_CHAN, 1500 * 1000,
+  // With short wiring, the baud rate could be at least twice what is
+  //  set here, but this probably isn't the limiting factor in 
+  //  throughput.
+  Pico7219 *pico7219 = pico7219_create (SPI_CHAN, 2000 * 1000,
     MOSI, SCK, CS, CHAIN_LEN, FALSE);
 
   // The module should power on blank, but let's be sure.
@@ -321,13 +318,13 @@ int main()
        // Handle scrolling
        if (scrolling)
          {
-	 scroll_count--;
-	 if (scroll_count <= 0)
-	   {
-	   scroll_count = SCROLL_TIME;
-	   pico7219_scroll (pico7219, TRUE);
-	   }
-	 }
+         scroll_count--;
+         if (scroll_count <= 0)
+           {
+           scroll_count = SCROLL_TIME;
+           pico7219_scroll (pico7219, TRUE);
+           }
+         }
        }
      switch (c)
        {
@@ -335,11 +332,11 @@ int main()
 
        case 10: // Line feed -- command is complete
          process_input_buffer (pico7219, in_buffer, line_buffer);  
-	 break;
+         break;
 
        default:
          // Note that input that won't fit in the buffer is dropped.
-	 buffer_append (in_buffer, c);
+         buffer_append (in_buffer, c);
        }
      } while (TRUE);
 

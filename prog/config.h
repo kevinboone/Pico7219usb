@@ -49,8 +49,9 @@
 // Time in milliseconds to delay between scrolls, when auto-scrolling.
 // In practice, it's hard to get very fast scrolling because of the
 // amount of data that has to be transferred, and the amount of binary
-// math required.  
-#define SCROLL_TIME 100 
+// math required. This delay is in addition to any time taked to
+// do the actual scroll-related processing
+#define SCROLL_TIME 50 
 
 
 

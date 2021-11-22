@@ -52,7 +52,7 @@ Copyright (c)2021 Kevin Boone, GPL v3.0
   =========================================================================*/
 #pragma once
 
-// ON -- Acol,row
+// ON -- Arow,col
 // Turn on an LED
 // Row, col are zero-indexed, from the _bottom left_ corner.  It isn't an error
 // to set values that are outside the range of the display, but they are
@@ -65,7 +65,7 @@ Copyright (c)2021 Kevin Boone, GPL v3.0
 // flush command is issued.
 #define CMD_ON       'A'
 
-// OFF -- Bcol,row
+// OFF -- Brow,col
 // Turn off an LED. Same considerations as ON apply.
 #define CMD_OFF      'B'
 
@@ -142,4 +142,7 @@ Copyright (c)2021 Kevin Boone, GPL v3.0
 // Command input too long (e.g., too many characters in string)
 #define ERR_TOOLONG  4
 
+// Display brightness in the range 0-15
+#define PICO7219_MAX_BRIGHTNESS 15
+#define PICO7219_MIN_BRIGHTNESS 0
 

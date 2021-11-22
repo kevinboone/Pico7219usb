@@ -28,6 +28,13 @@
 #define PICO7219_INTENSITY_REG 0x0A
 #define PICO7219_SHUTDOWN_REG 0x0C
 
+// Use a lookup table of reversed bytes, for occasions when we need to
+//   reverse the order of bits in a byte. The table only takes 256
+//   bytes, and we only have to do the initialization once. This is a lot
+//   quicker than doing the bit-reverse math every time we need it.
+static uint8_t pico7219_reverse_bits (uint8_t b);
+uint8_t rev_table[256];
+
 // An opaque data structure that holds the information relevant to the
 //   library. Users of the library do not see this, or need to. 
 
@@ -41,7 +48,7 @@ struct Pico7219
   spi_inst_t* spi; // The Pico-specific SPI device
 #endif
   // data is an array of bits that represents the states of the 
-  //   individual bits. They are packed into 8-bit chunks, which is
+  //   individual (hardware) bits. They are packed into 8-bit chunks, which is
   //   how the need to be written to the hardware, as well as saving
   //   space.
   uint8_t data[PICO7219_ROWS][PICO7219_MAX_CHAIN];
@@ -75,7 +82,8 @@ static void pico7219_write_word_to_chain (const struct Pico7219 *self,
   pico7219_cs (self, 0); 
 #if PICO_ON_DEVICE
   uint8_t buf[] = {hi, lo};
-  for (int i = 0; i < self->chain_len; i++)
+  int l = self->chain_len;
+  for (int i = 0; i < l; i++)
     spi_write_blocking (self->spi, buf, 2);
 #else
   (void)hi; (void)lo;
@@ -104,16 +112,24 @@ static void pico7219_init (const struct Pico7219 *self)
   pico7219_write_word_to_chain (self, 0x0b, 0x07); // scan limit = full 
   pico7219_write_word_to_chain (self, PICO7219_SHUTDOWN_REG, 0x01); // Run 
   pico7219_write_word_to_chain (self, 0x0f, 0x00); // Display test = off 
+  // Initialize the byte-reverse lookup table
+  for (int i = 0; i < 256; i++)
+    rev_table[i] =  pico7219_reverse_bits(i);
   }
 
-/** pico7219_create_vdata(). Create enough space for a "virtual"
-    chain of 8x8 displays, whose size is */
+/** pico7219_set_virtual_chain_length() */ 
 void pico7219_set_virtual_chain_length (struct Pico7219 *self, int chain_len)
   {
   if (self->vdata) free (self->vdata);
   self->vdata = malloc (PICO7219_ROWS * chain_len);
   memset (self->vdata, 0, PICO7219_ROWS * chain_len);
   self->vchain_len = chain_len;
+  }
+
+/** pico7219_get_virtual_chain_length() */ 
+int pico7219_get_virtual_chain_length (const struct Pico7219 *self)
+  {
+  return self->vchain_len;
   }
 
 /** pico7219_create() */
@@ -130,9 +146,9 @@ struct Pico7219 *pico7219_create (enum PicoSpiNum spi_num, int32_t baud,
     self->reverse_bits = reverse_bits;
     self->vdata = NULL;
     self->vchain_len = 0;
-    // Start with the virtual chain length the same as the maximum 
+    // Start with the virtual chain length the same as the 
     //  physical chain length
-    pico7219_set_virtual_chain_length (self, PICO7219_MAX_CHAIN);
+    pico7219_set_virtual_chain_length (self, chain_len);
     // Set data buffer to all "off", as that's how the LEDs power up
     memset (self->data, 0, sizeof (self->data));
     // Set all data clean
@@ -205,7 +221,7 @@ void pico7219_set_row_bits (const struct Pico7219 *self, uint8_t row,
     {
     uint8_t v = bits[chain_len - i - 1];
     if (self->reverse_bits)
-      v = pico7219_reverse_bits (v);
+      v = rev_table [v];
     uint8_t buf[] = {row + 1, v};
 #if PICO_ON_DEVICE
     spi_write_blocking (self->spi, buf, 2);

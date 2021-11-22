@@ -1,8 +1,6 @@
 # Pico7219usb
 
-Version 0.1a, Novemeber 2021
-
-_Work in progress_
+Version 0.1b, Novemeber 2021
 
 ## What is this?
 
@@ -40,7 +38,64 @@ the Pico device usually appears as `/dev/ttyACM0`.
 
 The full (very simple) protocol is defined in the file `prog/protocol.h`.
 
+## The concept of a "virtual module chain"
+
+MAX7219 devices are designed to be chained, with each unit controlling
+an 8x8 grid of LEDs, or perhaps eight 7-segment displays. Commercial
+devices usually come in single (8x8) modules, or groups of four modules.
+Larger displays can be created by chaining the display hardware. This
+firmware assumes an 32x8 display but it can, with simple changes, be
+adapted to larger chains.
+
+In practice, though, it's usually necessary to scroll the text, to fit
+more than a few characters of text. `pico7219usb` provides a "virtual"
+chain of modules of any length (subject to memory). The physical 
+modules can be see as a sliding windows in this virtual chain. 
+
+When the display is scrolled, it is the virtual chain that is scrolled;
+that is, the window offered by the physical display slides along the
+virtual display. The virtual display is sized in modules, not pixels
+because, Heaven knows, the math is hard enough already.
+
+Operations that display text, or switch LEDs on and off, automatically
+expand the virtual display. So, for example, if the LED at 
+row=1, column=200 is turned on, the virtual dislay is expanded to 26 
+modules. When the display is scrolled, all 26 modules scroll, and any
+LEDs that were lit on the left-hand edge are re-lit on the right-hand
+edge. 
+
+Writing new text, or setting additional LEDs, does not cause the 
+virtual chain to shrink, only to expand. The virtual chain starts
+off the same size as the physical module chaing (usual four 8x8 
+modules); this situation can only be restored by sending a reset
+code.
+
+In practice, the complexity of virtual modules and what-not is invisible
+to the user, if the firmware is used in the documented way.
+
+## Installing the firmware
+
+1. Download the UF2 file from the "Releases" section of the GitHub
+page. 
+
+2. Hold down the BOOTSEL button on the Pico, while connecting it
+to a computer's USB port
+
+3. Copy the UF2 file to the Pico's filesystem. In most modern
+operating systems, the filesystem should be mounted automatically
+when the USB cable is connected.
+
+4. As soon as the copy has completed (usually a few seconds), the
+firmware should start autoamtically, and the computer should detect
+that a new USB serial device has been connected.
+
+5. Consider whether you need to fiddle with the computer's 
+modem settings (see below).
+
 ## Building the firmware
+
+You shouldn't need to build the firmware from source, unless you
+want to change something.
 
 To build the firmware, you'll need the official Raspberry Pi Pico
 software development kit, and all its dependencies. Then the build
@@ -68,6 +123,9 @@ SPI baud rate, and get smoother scrolling.
 However, you'll probably need to arrange the components so that the
 Pico's BOOTSEL button is visible, so you can force the unit into
 bootloader mode to upload new firmware. 
+
+See the photos in the `pics/` directory for hardware assembly examples
+-- of course, there are many ways to attach the components.
 
 ## Testing
 
@@ -101,9 +159,8 @@ strings that are longer than 128 characters for this reason -- and
 because they create a memory burden for the Pico. 
 
 The 8x32 display can be seen as a scrolling window onto a longer
-"virtual" display. Any text that is scrolled off the left-hand
-edge of the display is moved to the right hand edge of the
-virtual display. This means that as the text scrolls, it will wrap
+"virtual" display, as described above.
+This means that as the text scrolls, it will wrap
 around and come back into view. Be aware, though, that the 
 software won't automatically apply any padding. If the text
 being displayed is an exact fit in the physical display, and
@@ -150,17 +207,39 @@ changed. This process allows for smoother updates, if used
 carefully.
 
 Scrolling operations work with individually-set LEDs as well
-as text; but be aware that the "virtual" display size is not
-changed by writing individual LEDs (yet). 
+as text. The "virtual chain" will be sized to increased to
+be as large as necessary to accomodate the LED coordinates.
+However, changing the virtual chain configuration resets all
+LEDs, so the LED that is furthest from the origin (bottom left)
+should be set first.
+
+It's potentially useful to bear in mind that setting an LED _off_
+also expands the size of the virtual chain. So, if you're not
+sure of the LED positions in advance, turn _off_ an LED that is
+as far to the right of the origin as you might conceivably turn
+on. This will set the virtual chain length in advance. 
 
 ## Tweaks
 
 As it stands, `Pico2719usb` supports up to eight 8x8 modules. 
 These settings can be tweaked in `pico7210/include/pico7219.h`. 
 All the other relevant tweaks, including the pin connections,
-are in `prog/config.h`.
+are in `prog/config.h`. The SPI baud rate is set in `prog/main.c`.
+The default value of 1.5Mb should work even with longish, untidy
+connections. With short connections I've tested it at much higher
+speeds. In the end, though, the math is more of a limiting factor
+than communication speed.
 
 ## Limitations
+
+This firmware is not designed to allow updating the display while it is
+scolling.  Results will be unpredicable. The expected sequence of operations
+is: (1) Reset. (2) Draw pixels/text. (3) Enable scrolling, if necessary.
+
+At present, the firmware only supports right-to-left scrolling. Since
+it only supports English (and similar) text, there's little need to
+scroll left-to-right. There's a case to be made for providing 
+vertical scrolling, but it isn't implemented yet.
 
 Pixel-by-pixel scrolling requires a _lot_ of binary shift and rotate
 arithmetic -- the display modules don't have any built-in support
@@ -171,9 +250,9 @@ at the "far" end of the module, we have to write every pixel along
 the way.
 
 All this means that scrolling is not all that smooth. There is
-a scroll delay setting that can be tweaked but, in practice, there
+a "scroll delay" setting that can be tweaked but, in practice, there
 isn't much point reducing it below 100 msec, because the limiting
-factor isn't the delay.
+factor isn't the delay, but the math.
  
 Although the brightness of the LEDs can be controlled, there is
 no "dark" level of brightness. Even the zero brightness level 
@@ -193,4 +272,19 @@ a computer's USB port. Be aware, however, that if many LEDs are
 turned on, and brightness is turned up, the current draw could
 challenge a USB port. 
 
+Most modern operating systems detect the Pico as a USB serial
+device. Some will automatically treat it as a serial modem.
+If that happens, the computer will sent a load of modem
+"AT" commands to configure it. These _should_ be ignored by
+the firmware, but this will delay the start-up. Configuring
+the computer to avoid treating the Pico as a modem is beyond the
+scope of this document. For testing purposes, or if you don't
+use serial modems at all, it's probably OK to disable the
+operating system's modem manager completely. 
+
+# Revision history
+
+0.1a, November 2021 -- first workable version
+
+0.2a, Novemeber 2021 -- various bug fixes
 

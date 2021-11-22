@@ -168,9 +168,16 @@ extern void pico7219_scroll (struct Pico7219 *self, BOOL wrap);
       the predefined maximum physical chain length, that is, 8 modules. 
       If you don't plan to use the scrolling function, you can save a
       little memory by setting the virtual chain length to the actual
-      chain length. But we're talking bytes here. */
+      chain length. But we're talking bytes here.
+
+      This function will clear all data. It is advisable not to change
+      the change length on a whim.
+*/
 extern void pico7219_set_virtual_chain_length (struct Pico7219 *self, 
    int chain_len);
+
+/** Get the current length of the "virtual chain" of modules. */
+extern int pico7219_get_virtual_chain_length (const struct Pico7219 *self);
 
 #ifdef __cplusplus
 } 
