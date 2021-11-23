@@ -143,7 +143,7 @@ On Linux systems, it should be possible simply to send text strings directly to
 the serial device. However, for reliable operation the device needs to be
 configured in a particular way. Please see the file `test.sh` for how to do
 this. To be honest, I don't know how to do the same thing on a Windows
-system.
+system. There is a more complicated, Perl example in `clock.pl`.
 
 ## Text control
 

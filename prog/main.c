@@ -18,8 +18,6 @@
 #include "prog/protocol.h"
 
 extern uint8_t font8_table[];
-extern uint8_t font8_first;
-extern uint8_t font8_last;
 
 // Number of millisecond ticks since the last scroll operation
 int scroll_count = 0;
